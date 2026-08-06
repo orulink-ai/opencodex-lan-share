@@ -55,7 +55,7 @@ if ($ocxFound) {
     Write-Host ("  Version: " + $ocxVersion.Trim())
 } else {
     Write-Host "  CLI:     NOT FOUND" -ForegroundColor Red
-    Write-Host "  Fix:     npm install -g opencodex" -ForegroundColor Yellow
+    Write-Host "  Fix:     npm install -g @bitkyc08/opencodex" -ForegroundColor Yellow
 }
 
 # === Codex Config ===

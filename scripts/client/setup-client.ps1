@@ -92,10 +92,10 @@ try {
 if (-not $ocxOk) {
     Write-Host "  [WARN] opencodex not found. Installing via npm..." -ForegroundColor Yellow
     if ($DryRun) {
-        Write-Host "  [DRY] Would run: npm install -g opencodex"
+        Write-Host "  [DRY] Would run: npm install -g @bitkyc08/opencodex"
     } else {
         try {
-            $installResult = npm install -g opencodex 2>&1
+            $installResult = npm install -g @bitkyc08/opencodex 2>&1
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "  [OK] opencodex installed successfully"
                 $ocxOk = $true
@@ -106,7 +106,7 @@ if (-not $ocxOk) {
             Write-Host "  [FAIL] Cannot install opencodex." -ForegroundColor Red
             Write-Host ""
             Write-Host "  Please install manually:" -ForegroundColor Yellow
-            Write-Host "    npm install -g opencodex"
+            Write-Host "    npm install -g @bitkyc08/opencodex"
             Write-Host ""
             Write-Host ("  Error details: " + $_.Exception.Message)
             exit 1

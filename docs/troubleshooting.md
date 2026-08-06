@@ -63,7 +63,7 @@ Or run specific test suites:
    ```
 2. Or manually install opencodex:
    ```powershell
-   npm install -g opencodex
+   npm install -g @bitkyc08/opencodex
    ```
 3. Verify installation:
    ```powershell
@@ -86,12 +86,12 @@ Check that "--- opencodex ---" section shows a version number, not "NOT FOUND".
 - macOS: The script attempts `brew install node`. If Homebrew is unavailable, install manually from https://nodejs.org/
 - Linux: The script attempts `sudo apt-get install nodejs npm`. For other distros, use the appropriate package manager.
 
-### 6. "npm install -g opencodex failed"
+### 6. "npm install -g @bitkyc08/opencodex failed"
 
 **Symptoms:** opencodex installation fails during setup.
 
 **Causes & fixes:**
-- Permission denied → On Linux, try `sudo npm install -g opencodex`
+- Permission denied → On Linux, try `sudo npm install -g @bitkyc08/opencodex`
 - npm registry unreachable → Check internet connection, try `npm config set registry https://registry.npmmirror.com` (China mirror)
 - Node.js version too old → Update to Node.js 18+ LTS
 

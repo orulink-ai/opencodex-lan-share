@@ -6,7 +6,7 @@
 #   {ACCESS_KEY}  - Your personal access key
 #
 # === REQUIREMENT: opencodex must be installed on the client machine ===
-# The setup script auto-installs it via: npm install -g opencodex
+# The setup script auto-installs it via: npm install -g @bitkyc08/opencodex
 # Verify: ocx --version
 
 # === REQUIRED: Route through the LAN proxy ===
@@ -24,7 +24,7 @@ wire_api = "responses"
 requires_openai_auth = true
 
 # === NOTES ===
-# - opencodex must be installed (npm install -g opencodex)
+# - opencodex must be installed (npm install -g @bitkyc08/opencodex)
 # - The proxy forwards your access key (no separate API key needed)
 # - All provider API keys (qwen-cloud, deepseek) stay on the server machine
 # - Models with prefix qwen-cloud/* and deepseek/* use the server's API keys

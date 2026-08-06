@@ -62,7 +62,7 @@ if (Test-Path $SetupClient) {
 # TC-CLIENT-WIN-02: Script has opencodex detection step
 # ============================================================
 $scriptContent = Get-Content $SetupClient -Raw
-if ($scriptContent -match "opencodex.*install|npm.*install.*opencodex|ocx.*--version") {
+if ($scriptContent -match "opencodex.*install|npm.*install.*@bitkyc08/opencodex|ocx.*--version") {
     Write-TestResult "TC-CLIENT-WIN-02" "Script detects/installs opencodex" $true ""
 } else {
     Write-TestResult "TC-CLIENT-WIN-02" "Script detects/installs opencodex" $false "No opencodex detection or install logic found in setup-client.ps1"

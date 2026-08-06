@@ -92,18 +92,18 @@ fi
 
 if [ "$OCX_OK" = false ]; then
     echo -e "  ${YELLOW}[WARN]${NC} opencodex 未安装，通过 npm 安装..."
-    npm install -g opencodex 2>/dev/null || {
+    npm install -g @bitkyc08/opencodex 2>/dev/null || {
         # Retry with sudo on Linux
         if [ "$(uname)" != "Darwin" ]; then
             echo -e "  ${YELLOW}[INFO]${NC} 尝试使用 sudo..."
-            sudo npm install -g opencodex 2>/dev/null || {
+            sudo npm install -g @bitkyc08/opencodex 2>/dev/null || {
                 echo -e "  ${RED}[FAIL]${NC} 无法安装 opencodex"
-                echo "  请手动安装：npm install -g opencodex"
+                echo "  请手动安装：npm install -g @bitkyc08/opencodex"
                 exit 1
             }
         else
             echo -e "  ${RED}[FAIL]${NC} 无法安装 opencodex"
-            echo "  请手动安装：npm install -g opencodex"
+            echo "  请手动安装：npm install -g @bitkyc08/opencodex"
             exit 1
         fi
     }

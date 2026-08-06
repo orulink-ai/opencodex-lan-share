@@ -111,7 +111,7 @@ curl -fsSL https://raw.githubusercontent.com/orulink-ai/opencodex-lan-share/main
 
 > **脚本会自动完成以下操作：**
 > 1. 检测并安装 Node.js（如未安装）
-> 2. 检测并安装 opencodex（`npm install -g opencodex`）
+> 2. 检测并安装 opencodex（`npm install -g @bitkyc08/opencodex`）
 > 3. 测试与服务器的连通性
 > 4. 配置 `~/.codex/config.toml`（设置 `base_url`、`model_provider` 等）
 > 5. 设置 `OPENAI_API_KEY` 环境变量
@@ -189,7 +189,7 @@ opencodex-lan-share/
 A: **不能。** 你的阿里云百炼、DeepSeek 等 API Key 只存在 `~/.opencodex/config.json` 里，永远不会传给同事的机器。
 
 **Q: 同事打开 Codex 后模型列表不更新怎么办？**
-A: 99% 的情况是同事机器上没有安装 opencodex。请让同事重新运行客户端脚本（脚本会自动检测并安装），或手动执行 `npm install -g opencodex`，然后完全退出 Codex Desktop 再重新打开。
+A: 99% 的情况是同事机器上没有安装 opencodex。请让同事重新运行客户端脚本（脚本会自动检测并安装），或手动执行 `npm install -g @bitkyc08/opencodex`，然后完全退出 Codex Desktop 再重新打开。
 
 **Q: 费用算谁的？**
 A: **你的。** 所有通过代理的 API 调用都走你的账户计费。建议在阿里云百炼控制台设置预算告警。
