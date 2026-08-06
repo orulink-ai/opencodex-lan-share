@@ -1,0 +1,28 @@
+# Windows
+Thumbs.db
+*.tmp
+*.log
+Desktop.ini
+
+# Secrets — NEVER commit these
+*.key
+*.token
+secrets/
+.env
+*.pem
+
+# Generated client configs
+client-configs/
+
+# Test artifacts
+tests/output/
+test-results/
+
+# PowerShell module cache
+*.psm1-cache
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
