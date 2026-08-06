@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
 # setup-client.sh
-# opencodex LAN Share - macOS/Linux Client Setup Script
-# Usage: SERVER_IP=192.168.1.110 ./scripts/client/setup-client.sh
-#    or: bash setup-client.sh 192.168.1.110
+# opencodex LAN Share - macOS/Linux 客户端一键接入脚本
+#
+# 方式一（推荐）：
+#   curl -fsSL https://raw.githubusercontent.com/orulink-ai/opencodex-lan-share/main/scripts/client/setup-client.sh | bash -s -- <服务器IP> <密钥>
+#
+# 方式二：手动下载后运行
+#   bash setup-client.sh 192.168.1.110 <密钥>
 
 set -euo pipefail
 
 SERVER_IP="${1:-${SERVER_IP:-}}"
+ACCESS_KEY="${2:-${ACCESS_KEY:-}}"
 PORT="${PORT:-10100}"
 CONFIG_PATH="${HOME}/.codex/config.toml"
+CATALOG_PATH="${HOME}/.codex/opencodex-catalog.json"
 DRY_RUN="${DRY_RUN:-false}"
 
 RED='\033[0;31m'
@@ -17,10 +23,9 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-if [ -z "$SERVER_IP" ]; then
-    echo -e "${RED}Error: Server IP is required.${NC}"
-    echo "Usage: bash setup-client.sh <server-ip>"
-    echo "   or: SERVER_IP=192.168.1.110 bash setup-client.sh"
+if [ -z "$SERVER_IP" ] || [ -z "$ACCESS_KEY" ]; then
+    echo -e "${RED}用法: bash setup-client.sh <服务器IP> <访问密钥>${NC}"
+    echo "示例: bash setup-client.sh 192.168.1.110 ocx_data_xxxx"
     exit 1
 fi
 
@@ -28,133 +33,141 @@ BASE_URL="http://${SERVER_IP}:${PORT}"
 
 echo ""
 echo -e "${CYAN}========================================${NC}"
-echo -e "${CYAN}  opencodex LAN Share - Client Setup${NC}"
+echo -e "${CYAN}  opencodex LAN Share - 客户端接入${NC}"
 echo -e "${CYAN}========================================${NC}"
-echo -e "  Server: ${BASE_URL}"
-echo -e "  Config: ${CONFIG_PATH}"
-if [ "$DRY_RUN" = "true" ]; then
-    echo -e "  Mode:   ${YELLOW}DRY RUN (no changes)${NC}"
-fi
-echo ""
+echo -e "  服务器: ${BASE_URL}"
+echo -e "  配置:   ${CONFIG_PATH}"
 
-# Step 1: Prerequisites
-echo -e "${YELLOW}Step 1/4: Checking prerequisites...${NC}"
-
-if command -v codex &>/dev/null; then
-    echo -e "  ${GREEN}[OK]${NC} Codex CLI found: $(codex --version 2>&1 | head -1)"
-else
-    echo -e "  ${YELLOW}[WARN]${NC} Codex CLI not in PATH. If you use Codex Desktop only, this is OK."
-fi
-
+# Step 1: 环境检测
+echo -e "${YELLOW}[1/5] 检测环境...${NC}"
 CONFIG_DIR="$(dirname "$CONFIG_PATH")"
-if [ ! -d "$CONFIG_DIR" ]; then
-    mkdir -p "$CONFIG_DIR"
-    echo -e "  ${GREEN}[OK]${NC} Created config directory: $CONFIG_DIR"
-fi
+mkdir -p "$CONFIG_DIR"
+echo -e "  ${GREEN}[OK]${NC} 配置目录已就绪"
 
-# Step 2: Connectivity test
-echo -e "${YELLOW}Step 2/4: Testing connectivity...${NC}"
-
+# Step 2: 网络测试
+echo -e "${YELLOW}[2/5] 测试网络连通性...${NC}"
 if command -v nc &>/dev/null; then
     if nc -z -w 3 "$SERVER_IP" "$PORT" 2>/dev/null; then
-        echo -e "  ${GREEN}[OK]${NC} Successfully connected to ${BASE_URL}"
+        echo -e "  ${GREEN}[OK]${NC} 成功连接到 ${BASE_URL}"
     else
-        echo -e "  ${RED}[FAIL]${NC} Cannot reach ${BASE_URL}"
-        echo ""
-        echo -e "  ${YELLOW}Troubleshooting:${NC}"
-        echo "    1. Is the server machine online and on the same LAN?"
-        echo "    2. Is the opencodex proxy running? (ocx status)"
-        echo "    3. Is the firewall configured? (run setup-lan.ps1 on server)"
+        echo -e "  ${RED}[失败]${NC} 无法连接到 ${SERVER_IP}:${PORT}"
+        echo "  排查：服务器是否开机？防火墙是否放行？是否同一局域网？"
         exit 1
     fi
-elif command -v timeout &>/dev/null; then
-    if timeout 3 bash -c "echo >/dev/tcp/${SERVER_IP}/${PORT}" 2>/dev/null; then
-        echo -e "  ${GREEN}[OK]${NC} Successfully connected to ${BASE_URL}"
-    else
-        echo -e "  ${RED}[FAIL]${NC} Cannot reach ${BASE_URL}"
-        exit 1
-    fi
+elif timeout 3 bash -c "echo >/dev/tcp/${SERVER_IP}/${PORT}" 2>/dev/null; then
+    echo -e "  ${GREEN}[OK]${NC} 成功连接到 ${BASE_URL}"
 else
-    echo -e "  ${YELLOW}[WARN]${NC} Cannot test connectivity (nc/timeout not found). Continuing anyway..."
+    echo -e "  ${YELLOW}[警告]${NC} 无法测试连通性，继续..."
 fi
 
-# Test models endpoint
+# 测试 API
 if command -v curl &>/dev/null; then
-    MODEL_COUNT=$(curl -s "${BASE_URL}/v1/models" 2>/dev/null | grep -o '"id"' | wc -l || echo "0")
+    MODEL_COUNT=$(curl -s -H "x-opencodex-api-key: ${ACCESS_KEY}" "${BASE_URL}/v1/models" 2>/dev/null | grep -o '"id"' | wc -l || echo "0")
     if [ "$MODEL_COUNT" -gt 0 ]; then
-        echo -e "  ${GREEN}[OK]${NC} Proxy serving ~${MODEL_COUNT} models"
+        echo -e "  ${GREEN}[OK]${NC} 代理正常，约 ${MODEL_COUNT} 个模型"
     fi
 fi
 
-# Step 3: Configure Codex
-echo -e "${YELLOW}Step 3/4: Configuring Codex...${NC}"
-
-if [ -f "$CONFIG_PATH" ] && grep -q "$SERVER_IP" "$CONFIG_PATH" 2>/dev/null; then
-    echo -e "  ${GREEN}[OK]${NC} Already configured for this proxy"
-else
-    # Backup
-    if [ -f "$CONFIG_PATH" ]; then
-        BACKUP="${CONFIG_PATH}.backup-$(date +%Y%m%d-%H%M%S)"
-        if [ "$DRY_RUN" != "true" ]; then
-            cp "$CONFIG_PATH" "$BACKUP"
-            echo -e "  ${GREEN}[OK]${NC} Backed up to $(basename "$BACKUP")"
-        else
-            echo -e "  ${YELLOW}[DRY]${NC} Would backup to $(basename "$BACKUP")"
-        fi
-    fi
-
-    if [ "$DRY_RUN" != "true" ]; then
-        # Remove existing base_url/openai_base_url lines
-        if [ -f "$CONFIG_PATH" ]; then
-            sed -i.bak '/^base_url\s*=/d' "$CONFIG_PATH"
-            sed -i.bak '/^openai_base_url\s*=/d' "$CONFIG_PATH"
-            sed -i.bak '/^model_provider\s*=/d' "$CONFIG_PATH"
-            rm -f "${CONFIG_PATH}.bak"
-        fi
-
-        # Add proxy configuration
-        {
-            echo ""
-            echo "# opencodex LAN Share - Proxy Configuration"
-            echo "openai_base_url = \"${BASE_URL}/v1\""
-            echo "model_provider = \"opencodex\""
-        } >> "$CONFIG_PATH"
-
-        echo -e "  ${GREEN}[OK]${NC} Configuration updated"
+# Step 3: 下载模型目录
+echo -e "${YELLOW}[3/5] 同步模型目录...${NC}"
+if command -v curl &>/dev/null && [ "$DRY_RUN" != "true" ]; then
+    if curl -s -H "x-opencodex-api-key: ${ACCESS_KEY}" "${BASE_URL}/v1/models" -o /tmp/ocx-models.json 2>/dev/null; then
+        # 转换为简易 catalog 格式
+        MODEL_COUNT=$(python3 -c "
+import json, sys
+data = json.load(open('/tmp/ocx-models.json'))
+models = []
+for m in data.get('data', []):
+    models.append({
+        'slug': m['id'],
+        'display_name': f\"{m['id']} ({m.get('owned_by', 'system')})\",
+        'context_window': 131072,
+        'input_modalities': ['text']
+    })
+catalog = {'fetched_at': '$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'models': models}
+json.dump(catalog, open('${CATALOG_PATH}', 'w'), indent=2)
+print(len(models))
+" 2>/dev/null || echo "0")
+        echo -e "  ${GREEN}[OK]${NC} 模型目录已同步 (${MODEL_COUNT} 个模型)"
+        rm -f /tmp/ocx-models.json
+        CATALOG_DOWNLOADED=true
     else
-        echo -e "  ${YELLOW}[DRY]${NC} Would add:"
-        echo "       openai_base_url = \"${BASE_URL}/v1\""
-        echo "       model_provider = \"opencodex\""
+        echo -e "  ${YELLOW}[警告]${NC} 无法下载模型目录"
+        CATALOG_DOWNLOADED=false
     fi
+else
+    CATALOG_DOWNLOADED=false
 fi
 
-# Step 4: Available models
-echo -e "${YELLOW}Step 4/4: Available models...${NC}"
+# Step 4: 配置 Codex
+echo -e "${YELLOW}[4/5] 配置 Codex...${NC}"
 
-if command -v curl &>/dev/null; then
-    echo ""
-    echo -e "  ${GREEN}Model groups available through the proxy:${NC}"
-    curl -s "${BASE_URL}/v1/models" 2>/dev/null | \
-        grep -o '"id":"[^"]*"' | \
-        sed 's/"id":"//;s/"//' | \
-        grep -E "^(qwen-cloud/qwen3-coder|deepseek/|gpt-5)" | \
-        sort -u | \
-        head -10 | \
-        while read -r model; do
-            echo "    - $model"
-        done
+# 备份
+if [ -f "$CONFIG_PATH" ] && [ "$DRY_RUN" != "true" ]; then
+    BACKUP="${CONFIG_PATH}.backup-$(date +%Y%m%d-%H%M%S)"
+    cp "$CONFIG_PATH" "$BACKUP"
+    echo -e "  ${GREEN}[OK]${NC} 已备份到 $(basename "$BACKUP")"
 fi
 
-# Summary
+# 清理旧配置 + 写入新配置
+if [ "$DRY_RUN" != "true" ] && [ -f "$CONFIG_PATH" ]; then
+    sed -i.bak '/^openai_base_url\s*=/d' "$CONFIG_PATH"
+    sed -i.bak '/^base_url\s*=/d' "$CONFIG_PATH"
+    sed -i.bak '/^model_provider\s*=/d' "$CONFIG_PATH"
+    sed -i.bak '/^model_catalog_json\s*=/d' "$CONFIG_PATH"
+    rm -f "${CONFIG_PATH}.bak"
+fi
+
+if [ "$DRY_RUN" != "true" ]; then
+    {
+        echo ""
+        echo "# === opencodex LAN Share ==="
+        echo "openai_base_url = \"${BASE_URL}/v1\""
+        echo "model_provider = \"opencodex\""
+        if [ "${CATALOG_DOWNLOADED:-false}" = "true" ]; then
+            echo "model_catalog_json = \"${CATALOG_PATH}\""
+        fi
+        echo "# ============================"
+    } >> "$CONFIG_PATH"
+    echo -e "  ${GREEN}[OK]${NC} 配置已更新"
+else
+    echo -e "  ${YELLOW}[预览]${NC} 将更新配置"
+fi
+
+# Step 5: 环境变量
+echo -e "${YELLOW}[5/5] 设置认证密钥...${NC}"
+
+SHELL_RC=""
+if [ -f "${HOME}/.zshrc" ]; then SHELL_RC="${HOME}/.zshrc"; fi
+if [ -f "${HOME}/.bashrc" ]; then SHELL_RC="${HOME}/.bashrc"; fi
+if [ -f "${HOME}/.bash_profile" ]; then SHELL_RC="${HOME}/.bash_profile"; fi
+
+if [ -n "$SHELL_RC" ] && [ "$DRY_RUN" != "true" ]; then
+    # 移除旧的配置
+    sed -i.bak '/^export OPENCODEX_OPENCODE_API_KEY=/d' "$SHELL_RC" 2>/dev/null || true
+    rm -f "${SHELL_RC}.bak"
+    # 添加新配置
+    echo "export OPENCODEX_OPENCODE_API_KEY=\"${ACCESS_KEY}\"" >> "$SHELL_RC"
+    echo -e "  ${GREEN}[OK]${NC} 已添加到 ${SHELL_RC}"
+    echo -e "  ${YELLOW}[提示]${NC} 运行 'source ${SHELL_RC}' 或新开终端生效"
+else
+    echo -e "  ${YELLOW}[提示]${NC} 请手动设置环境变量："
+    echo "       export OPENCODEX_OPENCODE_API_KEY=\"${ACCESS_KEY}\""
+fi
+
+# 完成
 echo ""
 echo -e "${CYAN}========================================${NC}"
-echo -e "${GREEN}  Client Setup Complete!${NC}"
+echo -e "${GREEN}  配置完成！${NC}"
 echo -e "${CYAN}========================================${NC}"
 echo ""
-echo "  Your Codex is configured to use the LAN proxy at:"
-echo "    ${BASE_URL}/v1"
+echo "  接下来："
+echo "    1. 完全退出 Codex Desktop"
+echo "    2. 重新打开 Codex Desktop"
+echo "    3. 模型选择器中找 qwen-cloud/qwen3-coder-plus"
 echo ""
-echo "  To use: Open Codex and select any qwen-cloud/* or deepseek/* model."
-echo ""
-echo "  To revert: Restore from backup in ${CONFIG_DIR}/"
+echo "  常用模型："
+echo "    qwen-cloud/qwen3-coder-plus   （编程推荐）"
+echo "    qwen-cloud/qwen3-coder-flash  （更快更便宜）"
+echo "    deepseek/deepseek-v4-flash    （DeepSeek 最新）"
 echo ""

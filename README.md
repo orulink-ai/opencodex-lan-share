@@ -51,37 +51,48 @@ cd D:\Project\opencodex-lan-share
 
 记下输出的密钥和你的局域网 IP（如 `192.168.1.110`）。
 
-### 第二步：同事接入
+### 第二步：为同事创建密钥
 
-发给同事的话术模板：
+```powershell
+# 每个同事一个密钥，方便管理和吊销
+.\scripts\server\manage-users.ps1 -Create "张三"
+```
 
-> 办公室部署了共享 AI 代理，你只需要在电脑上跑一条命令就能用上 qwen / deepseek 等模型。打开 PowerShell（不是 CMD），复制下面这行，回车：
+> 记下输出的密钥（只显示一次！），和你的局域网 IP 一起发给同事。
+
+### 第三步：同事接入
+
+发给同事的话术模板（替换 IP 和密钥）：
+
+> 办公室部署了共享 AI 代理，打开 PowerShell 粘贴下面这行就行：
 
 #### 方式一：一键命令（推荐，无需下载任何东西）
 
-**Windows 同事：** 打开 PowerShell，粘贴运行：
+> 管理员先把**服务器 IP** 和 **访问密钥** 发给同事。
+
+**Windows 同事：** 打开 PowerShell，粘贴运行（把 `IP` 和 `密钥` 替换为实际值）：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr -Uri 'https://raw.githubusercontent.com/orulink-ai/opencodex-lan-share/main/scripts/client/setup-client.ps1' -OutFile 'setup-client.ps1'; .\setup-client.ps1 -ServerIp 192.168.1.110"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr -Uri 'https://raw.githubusercontent.com/orulink-ai/opencodex-lan-share/main/scripts/client/setup-client.ps1' -OutFile 'setup.ps1'; .\setup.ps1 -ServerIp 192.168.1.110 -AccessKey ocx_data_xxxx"
 ```
 
-> ⚠️ 把 `192.168.1.110` 换成你的实际局域网 IP。
+> ⚠️ 把 `192.168.1.110` 换成实际 IP，`ocx_data_xxxx` 换成管理员给你的密钥。
 
 **macOS / Linux 同事：** 打开终端，粘贴运行：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/orulink-ai/opencodex-lan-share/main/scripts/client/setup-client.sh | bash -s -- 192.168.1.110
+curl -fsSL https://raw.githubusercontent.com/orulink-ai/opencodex-lan-share/main/scripts/client/setup-client.sh | bash -s -- 192.168.1.110 ocx_data_xxxx
 ```
 
-> ⚠️ 把 `192.168.1.110` 换成你的实际局域网 IP。
+> ⚠️ 把 `192.168.1.110` 换成实际 IP，`ocx_data_xxxx` 换成管理员给你的密钥。
 
 #### 方式二：手动下载（如果 GitHub 访问不了）
 
 1. 让同事浏览器打开：`https://github.com/orulink-ai/opencodex-lan-share`
 2. 点绿色 `Code` 按钮 → `Download ZIP`
 3. 解压后进入 `scripts\client\` 目录
-4. Windows：右键 `setup-client.ps1` → 使用 PowerShell 运行，输入服务器 IP
-5. Mac/Linux：`bash setup-client.sh 192.168.1.110`
+4. Windows：右键 `setup-client.ps1` → 使用 PowerShell 运行，输入服务器 IP 和密钥
+5. Mac/Linux：`bash setup-client.sh 192.168.1.110 ocx_data_xxxx`
 
 #### 配置完成后
 
