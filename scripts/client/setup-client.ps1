@@ -101,9 +101,16 @@ if (Test-Path $ConfigPath) { $lines = Get-Content $ConfigPath }
 
 $newLines = @()
 $injected = $false
+$skipSection = $false
 
 foreach ($line in $lines) {
     $trimmed = $line.Trim()
+    # Skip old [model_providers.opencodex] section
+    if ($trimmed -eq '[model_providers.opencodex]') { $skipSection = $true; continue }
+    if ($skipSection) {
+        if ($trimmed -match '^\[.*\]') { $skipSection = $false }
+        else { continue }
+    }
     # Remove old proxy/opencodex config lines
     if ($trimmed -match '^openai_base_url\s*=') { continue }
     if ($trimmed -match '^model_provider\s*=') { continue }
@@ -115,6 +122,14 @@ foreach ($line in $lines) {
             $newLines += ""
             $newLines += "# === opencodex LAN Share ==="
             $newLines += "base_url = """ + $BaseUrl + "/v1"""
+            $newLines += "model_provider = ""opencodex"""
+            $newLines += "wire_api = ""responses"""
+            $newLines += ""
+            $newLines += "[model_providers.opencodex]"
+            $newLines += "name = ""OpenCodex Proxy (" + $ServerIp + ")"""
+            $newLines += "base_url = """ + $BaseUrl + "/v1"""
+            $newLines += "wire_api = ""responses"""
+            $newLines += "requires_openai_auth = true"
             $newLines += "# ============================"
             $newLines += ""
             $injected = $true
@@ -128,13 +143,21 @@ if (-not $injected) {
     $newLines += ""
     $newLines += "# === opencodex LAN Share ==="
     $newLines += "base_url = """ + $BaseUrl + "/v1"""
+    $newLines += "model_provider = ""opencodex"""
+    $newLines += "wire_api = ""responses"""
+    $newLines += ""
+    $newLines += "[model_providers.opencodex]"
+    $newLines += "name = ""OpenCodex Proxy (" + $ServerIp + ")"""
+    $newLines += "base_url = """ + $BaseUrl + "/v1"""
+    $newLines += "wire_api = ""responses"""
+    $newLines += "requires_openai_auth = true"
     $newLines += "# ============================"
 }
 
 if (-not $DryRun) {
     $newLines -join "`r`n" | Set-Content -Path $ConfigPath -Encoding UTF8
     Write-Host ("  [OK] base_url = " + $BaseUrl + "/v1")
-    Write-Host "       (no model_provider - uses standard OpenAI protocol)"
+    Write-Host "  [OK] model_provider = opencodex (with model_providers section)"
 } else {
     Write-Host "  [DRY] Would update config"
 }

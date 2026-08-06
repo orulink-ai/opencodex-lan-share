@@ -68,24 +68,34 @@ if [ -f "$CONFIG_PATH" ]; then
     echo -e "  ${GREEN}[OK]${NC} 已备份到 $(basename "$BACKUP")"
 
     # 移除旧的 opencodex 配置
-    sed -i.bak '/^openai_base_url[[:space:]]*=/d' "$CONFIG_PATH"
-    sed -i.bak '/^base_url[[:space:]]*=/d' "$CONFIG_PATH"
-    sed -i.bak '/^model_provider[[:space:]]*=/d' "$CONFIG_PATH"
-    sed -i.bak '/^model_catalog_json[[:space:]]*=/d' "$CONFIG_PATH"
-    sed -i.bak '/^wire_api[[:space:]]*=/d' "$CONFIG_PATH"
+    sed -i.bak '/^openai_base_url\s*=/d' "$CONFIG_PATH"
+    sed -i.bak '/^base_url\s*=/d' "$CONFIG_PATH"
+    sed -i.bak '/^model_provider\s*=/d' "$CONFIG_PATH"
+    sed -i.bak '/^model_catalog_json\s*=/d' "$CONFIG_PATH"
+    sed -i.bak '/^wire_api\s*=/d' "$CONFIG_PATH"
+    sed -i.bak '/^\[model_providers\.opencodex\]/,/^\[/d' "$CONFIG_PATH"
     rm -f "${CONFIG_PATH}.bak"
 fi
 
-# 写入新配置（标准 OpenAI 协议，不设 model_provider）
+# 写入新配置
 {
     echo ""
     echo "# === opencodex LAN Share ==="
     echo "base_url = \"${BASE_URL}/v1\""
+    echo "model_provider = \"opencodex\""
+    echo "wire_api = \"responses\""
+    echo ""
+    echo "[model_providers.opencodex]"
+    echo "name = \"OpenCodex Proxy (${SERVER_IP})\""
+    echo "base_url = \"${BASE_URL}/v1\""
+    echo "wire_api = \"responses\""
+    echo "requires_openai_auth = true"
     echo "# ============================"
 } >> "$CONFIG_PATH"
 echo -e "  ${GREEN}[OK]${NC} 配置已更新"
 echo -e "       ${GREEN}✓${NC} base_url = ${BASE_URL}/v1"
-echo -e "       ${GREEN}✓${NC} 使用标准 OpenAI 协议（不设 model_provider）"
+echo -e "       ${GREEN}✓${NC} model_provider = opencodex"
+echo -e "       ${GREEN}✓${NC} 已添加 model_providers 配置段"
 
 # Step 4: 环境变量（macOS 特殊处理）
 echo -e "${YELLOW}[4/4] 设置密钥...${NC}"
