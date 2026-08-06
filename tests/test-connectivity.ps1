@@ -4,7 +4,8 @@
 
 param(
     [string]$ServerIp = "127.0.0.1",
-    [int]$Port = 10100
+    [int]$Port = 10100,
+    [string]$AccessKey = ""
 )
 
 $ErrorActionPreference = "Continue"
@@ -83,7 +84,15 @@ try {
 # TC-CONN-04: Response latency
 try {
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
-    $null = Invoke-RestMethod -Uri ($BaseUrl + "/health") -Method Get -TimeoutSec 10 -ErrorAction Stop
+    if ($AccessKey) {
+        $headers = @{"Authorization" = "Bearer " + $AccessKey}
+        $null = Invoke-RestMethod -Uri ($BaseUrl + "/v1/models") -Method Get -Headers $headers -TimeoutSec 10 -ErrorAction Stop
+    } else {
+        # No AccessKey: use TCP round-trip as proxy for latency
+        $tcp = New-Object System.Net.Sockets.TcpClient
+        $tcp.Connect($ServerIp, $Port)
+        $tcp.Close()
+    }
     $sw.Stop()
     $latency = $sw.ElapsedMilliseconds
     if ($latency -lt 5000) {

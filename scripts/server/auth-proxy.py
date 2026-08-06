@@ -21,14 +21,15 @@ def load_valid_keys():
     config_path = os.path.expanduser("~/.opencodex/config.json")
     keys = set()
     try:
-        with open(config_path) as f:
+        with open(config_path, encoding='utf-8') as f:
             config = json.load(f)
         for entry in config.get("apiKeys", []):
             if "key" in entry and entry["key"].strip():
                 keys.add(entry["key"].strip())
         log.info(f"Loaded {len(keys)} valid access key(s)")
     except Exception as e:
-        log.error(f"Failed to load keys: {e}")
+        log.error(f"Failed to load keys from {config_path}: {e}")
+        log.error("On Windows with CJK locale, ensure config.json is UTF-8 encoded")
     return keys
 
 VALID_KEYS = set()

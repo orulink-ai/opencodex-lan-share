@@ -148,7 +148,7 @@ if ($connected) {
     Write-Host "  Troubleshooting:"
     Write-Host "    1. Is the server online and on the same LAN?"
     Write-Host "    2. Is auth-proxy.py running on the server? (netstat -an | findstr 10101)"
-    Write-Host "    3. Is the firewall open for port " + $Port + "?"
+    Write-Host ("    3. Is the firewall open for port " + $Port + "?")
     Write-Host "    4. Is your network profile set to Private?"
     exit 1
 }
@@ -161,7 +161,14 @@ try {
     Write-Host ("  [OK] API OK, " + $count + " models available")
 } catch {
     $msg = $_.Exception.Message
-    Write-Host ("  [WARN] API test: " + $msg) -ForegroundColor Yellow
+    if ($msg -match "401") {
+        Write-Host "  [WARN] API returned 401 - your AccessKey may not be registered on the server." -ForegroundColor Yellow
+        Write-Host "         Ask the server admin to run:"
+        Write-Host "           .\scripts\server\manage-users.ps1 -Create \"YourName\""
+        Write-Host "         Then re-run this script with your new AccessKey."
+    } else {
+        Write-Host ("  [WARN] API test: " + $msg) -ForegroundColor Yellow
+    }
 }
 
 Write-Host ""
@@ -321,7 +328,7 @@ if (-not $envSet) {
 }
 
 Write-Host "  To revert:"
-Write-Host "    Restore from backup file in " + $ConfigDir
+Write-Host ("    Restore from backup file in " + $ConfigDir)
 Write-Host "    Or remove lines between # === opencodex LAN Share === markers"
 Write-Host ""
 
