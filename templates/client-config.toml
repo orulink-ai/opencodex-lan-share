@@ -1,23 +1,31 @@
-# opencodex LAN Share - Client Configuration Template
+﻿# opencodex LAN Share - Client Configuration Template
 # This file is used by setup-client.ps1 / setup-client.sh
 # Variables are replaced at setup time:
 #   {SERVER_IP}   - LAN IP of the opencodex server machine
-#   {PORT}        - Proxy port (default: 10100)
-#   {CATALOG_PATH} - Path to the shared model catalog (optional)
+#   {PORT}        - Proxy port (default: 10101)
+#   {ACCESS_KEY}  - Your personal access key
+#
+# === REQUIREMENT: opencodex must be installed on the client machine ===
+# The setup script auto-installs it via: npm install -g opencodex
+# Verify: ocx --version
 
-# === REQUIRED: Route Codex through the LAN proxy ===
-openai_base_url = "http://{SERVER_IP}:{PORT}/v1"
+# === REQUIRED: Route through the LAN proxy ===
+base_url = "http://{SERVER_IP}:{PORT}/v1"
 
-# === OPTIONAL: Use the shared model catalog ===
-# Uncomment this line to use the server's model catalog:
-# model_catalog_json = "{CATALOG_PATH}"
-
-# === Provider configuration ===
-# The opencodex proxy acts as the model provider
+# === Provider configuration (opencodex-specific) ===
 model_provider = "opencodex"
+wire_api = "responses"
+
+# === Provider section ===
+[model_providers.opencodex]
+name = "OpenCodex Proxy ({SERVER_IP})"
+base_url = "http://{SERVER_IP}:{PORT}/v1"
+wire_api = "responses"
+requires_openai_auth = true
 
 # === NOTES ===
-# - The proxy forwards your Codex session credentials (no separate API key needed)
+# - opencodex must be installed (npm install -g opencodex)
+# - The proxy forwards your access key (no separate API key needed)
 # - All provider API keys (qwen-cloud, deepseek) stay on the server machine
-# - You keep your own OpenAI OAuth session for gpt-* models
 # - Models with prefix qwen-cloud/* and deepseek/* use the server's API keys
+# - OPENAI_API_KEY env var must be set to your access key

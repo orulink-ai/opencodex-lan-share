@@ -1,5 +1,12 @@
-# setup-client.ps1
+﻿# setup-client.ps1
 # opencodex LAN Share - Windows Client Setup (one-liner friendly)
+#
+# This script:
+#   1. Detects Node.js (installs if missing)
+#   2. Installs opencodex globally via npm
+#   3. Tests connectivity to the LAN server
+#   4. Configures opencodex to route through the LAN proxy
+#   5. Sets the OPENAI_API_KEY environment variable
 #
 # Usage:
 #   .\setup-client.ps1 -ServerIp 192.168.1.110 -AccessKey ocx_data_xxxx
@@ -31,9 +38,88 @@ if ($DryRun) { Write-Host "  Mode:   DRY RUN (preview only)" -ForegroundColor Ye
 Write-Host ""
 
 # ============================================================
+# Step 0: Detect and install opencodex
+# ============================================================
+Write-Host "[0/5] Checking Node.js and opencodex..." -ForegroundColor Yellow
+
+# 0a: Check Node.js
+$nodeOk = $false
+try {
+    $nodeVersion = node --version 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host ("  [OK] Node.js " + $nodeVersion.Trim())
+        $nodeOk = $true
+    }
+} catch { }
+
+if (-not $nodeOk) {
+    Write-Host "  [WARN] Node.js not found. Attempting to install via winget..." -ForegroundColor Yellow
+    try {
+        if ($DryRun) {
+            Write-Host "  [DRY] Would run: winget install OpenJS.NodeJS.LTS"
+        } else {
+            winget install OpenJS.NodeJS.LTS --silent --accept-source-agreements --accept-package-agreements 2>&1 | Out-Null
+            Write-Host "  [OK] Node.js installed. Please restart this script in a new terminal."
+            Write-Host ""
+            Write-Host "  [!] Node.js was just installed. You need to:" -ForegroundColor Yellow
+            Write-Host "      1. Close this PowerShell window"
+            Write-Host "      2. Open a NEW PowerShell window"
+            Write-Host "      3. Re-run this script:"
+            Write-Host ("         .\setup-client.ps1 -ServerIp " + $ServerIp + " -AccessKey " + $AccessKey)
+            exit 0
+        }
+    } catch {
+        Write-Host "  [FAIL] Cannot install Node.js automatically." -ForegroundColor Red
+        Write-Host ""
+        Write-Host "  Please install Node.js manually:" -ForegroundColor Yellow
+        Write-Host "    1. Visit https://nodejs.org/"
+        Write-Host "    2. Download and install the LTS version"
+        Write-Host "    3. Restart your terminal and re-run this script"
+        exit 1
+    }
+}
+
+# 0b: Check opencodex
+$ocxOk = $false
+try {
+    $ocxVersion = ocx --version 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host ("  [OK] opencodex " + $ocxVersion.Trim())
+        $ocxOk = $true
+    }
+} catch { }
+
+if (-not $ocxOk) {
+    Write-Host "  [WARN] opencodex not found. Installing via npm..." -ForegroundColor Yellow
+    if ($DryRun) {
+        Write-Host "  [DRY] Would run: npm install -g opencodex"
+    } else {
+        try {
+            $installResult = npm install -g opencodex 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "  [OK] opencodex installed successfully"
+                $ocxOk = $true
+            } else {
+                throw "npm install failed"
+            }
+        } catch {
+            Write-Host "  [FAIL] Cannot install opencodex." -ForegroundColor Red
+            Write-Host ""
+            Write-Host "  Please install manually:" -ForegroundColor Yellow
+            Write-Host "    npm install -g opencodex"
+            Write-Host ""
+            Write-Host ("  Error details: " + $_.Exception.Message)
+            exit 1
+        }
+    }
+}
+
+Write-Host ""
+
+# ============================================================
 # Step 1: Environment check
 # ============================================================
-Write-Host "[1/4] Checking environment..." -ForegroundColor Yellow
+Write-Host "[1/5] Checking environment..." -ForegroundColor Yellow
 
 if (-not (Test-Path $ConfigDir)) {
     New-Item -ItemType Directory -Path $ConfigDir -Force | Out-Null
@@ -45,7 +131,7 @@ Write-Host ""
 # ============================================================
 # Step 2: Connectivity test
 # ============================================================
-Write-Host "[2/4] Testing connectivity..." -ForegroundColor Yellow
+Write-Host "[2/5] Testing connectivity..." -ForegroundColor Yellow
 
 $connected = $false
 try {
@@ -83,7 +169,7 @@ Write-Host ""
 # ============================================================
 # Step 3: Configure Codex
 # ============================================================
-Write-Host "[3/4] Configuring Codex..." -ForegroundColor Yellow
+Write-Host "[3/5] Configuring Codex..." -ForegroundColor Yellow
 
 # Backup existing config
 if (Test-Path $ConfigPath) {
@@ -167,7 +253,7 @@ Write-Host ""
 # ============================================================
 # Step 4: Set API key
 # ============================================================
-Write-Host "[4/4] Setting API key..." -ForegroundColor Yellow
+Write-Host "[4/5] Setting API key..." -ForegroundColor Yellow
 
 $envSet = $false
 try {
@@ -190,6 +276,29 @@ try {
 Write-Host ""
 
 # ============================================================
+# Step 5: Verify opencodex can read config
+# ============================================================
+Write-Host "[5/5] Verifying opencodex configuration..." -ForegroundColor Yellow
+
+if ($ocxOk) {
+    try {
+        $modelResult = ocx models list 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "  [OK] opencodex can read config and fetch models"
+        } else {
+            Write-Host "  [WARN] opencodex models list returned non-zero" -ForegroundColor Yellow
+            Write-Host ("         " + ($modelResult -join " "))
+        }
+    } catch {
+        Write-Host "  [WARN] Could not verify opencodex config" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "  [SKIP] opencodex not available for verification"
+}
+
+Write-Host ""
+
+# ============================================================
 # Done
 # ============================================================
 Write-Host "========================================" -ForegroundColor Cyan
@@ -202,8 +311,8 @@ Write-Host "    2. Reopen Codex Desktop"
 Write-Host "    3. Models should appear in the model selector"
 Write-Host ""
 Write-Host "  How it works:"
-Write-Host "    Your Codex -> OpenAI protocol -> Server proxy"
-Write-Host "    -> opencodex -> Alibaba / DeepSeek / OpenAI"
+Write-Host "    Your opencodex -> OpenAI protocol -> Server auth-proxy"
+Write-Host "    -> opencodex proxy -> Alibaba / DeepSeek / OpenAI"
 Write-Host ""
 
 if (-not $envSet) {

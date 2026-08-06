@@ -1,4 +1,4 @@
-# diagnostics.ps1
+﻿# diagnostics.ps1
 # opencodex LAN Share - Diagnostic Tool
 # Usage: .\tools\diagnostics.ps1 [-ServerIp <ip>] [-Port <port>]
 # Runs on either server or client side to diagnose connectivity issues.
@@ -33,32 +33,19 @@ Write-Host "  LAN IPs: " + ($ips -join ", ")
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 Write-Host ("  Admin:   " + (if ($isAdmin) { "Yes" } else { "No (some checks limited)" }))
 
-# === Codex Status ===
+# === Node.js ===
 Write-Host ""
-Write-Host "--- Codex ---" -ForegroundColor Yellow
-$codexFound = $false
-foreach ($path in @("$env:LOCALAPPDATA\OpenAI\Codex\bin\codex.exe", "$env:APPDATA\OpenAI\Codex\bin\codex.exe")) {
-    if (Test-Path $path) { Write-Host ("  Binary:  " + $path); $codexFound = $true; break }
-}
-if (-not $codexFound) { Write-Host "  Binary:  NOT FOUND" -ForegroundColor Red }
-
-$configPath = Join-Path $HOME ".codex\config.toml"
-if (Test-Path $configPath) {
-    Write-Host ("  Config:  " + $configPath + " (exists)")
-    $configContent = Get-Content $configPath -Raw
-    if ($configContent -match 'openai_base_url\s*=\s*"([^"]*)"') {
-        Write-Host ("  Proxy:   " + $matches[1])
-    } else {
-        Write-Host "  Proxy:   NOT CONFIGURED (no openai_base_url)" -ForegroundColor Red
-    }
-    if ($configContent -match 'model_provider\s*=\s*"([^"]*)"') {
-        Write-Host ("  Provider:" + $matches[1])
-    }
+Write-Host "--- Node.js ---" -ForegroundColor Yellow
+$nodeFound = Get-Command node -ErrorAction SilentlyContinue
+if ($nodeFound) {
+    $nodeVersion = node --version 2>&1
+    Write-Host ("  Node.js: " + $nodeVersion.Trim())
 } else {
-    Write-Host "  Config:  NOT FOUND" -ForegroundColor Red
+    Write-Host "  Node.js: NOT FOUND" -ForegroundColor Red
+    Write-Host "  Fix:     Install Node.js from https://nodejs.org/" -ForegroundColor Yellow
 }
 
-# === opencodex Status (server-side) ===
+# === opencodex Status ===
 Write-Host ""
 Write-Host "--- opencodex ---" -ForegroundColor Yellow
 $ocxFound = Get-Command ocx -ErrorAction SilentlyContinue
@@ -67,7 +54,30 @@ if ($ocxFound) {
     $ocxVersion = ocx --version 2>&1
     Write-Host ("  Version: " + $ocxVersion.Trim())
 } else {
-    Write-Host "  CLI:     NOT FOUND (client mode - OK)" -ForegroundColor Yellow
+    Write-Host "  CLI:     NOT FOUND" -ForegroundColor Red
+    Write-Host "  Fix:     npm install -g opencodex" -ForegroundColor Yellow
+}
+
+# === Codex Config ===
+Write-Host ""
+Write-Host "--- Config ---" -ForegroundColor Yellow
+$configPath = Join-Path $HOME ".codex\config.toml"
+if (Test-Path $configPath) {
+    Write-Host ("  Config:  " + $configPath + " (exists)")
+    $configContent = Get-Content $configPath -Raw
+    if ($configContent -match 'base_url\s*=\s*"([^"]*)"') {
+        Write-Host ("  base_url:" + $matches[1])
+    } else {
+        Write-Host "  base_url: NOT CONFIGURED" -ForegroundColor Red
+    }
+    if ($configContent -match 'model_provider\s*=\s*"([^"]*)"') {
+        Write-Host ("  Provider:" + $matches[1])
+    }
+    if ($configContent -match 'openai_base_url\s*=\s*"([^"]*)"') {
+        Write-Host ("  WARNING:  openai_base_url found (deprecated - standard Codex Desktop ignores this)" -ForegroundColor Yellow)
+    }
+} else {
+    Write-Host "  Config:  NOT FOUND" -ForegroundColor Red
 }
 
 # === Network ===

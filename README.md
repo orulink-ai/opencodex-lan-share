@@ -1,10 +1,10 @@
-# opencodex LAN Share
+﻿# opencodex LAN Share
 
 > 将本机 opencodex 代理共享给办公室局域网内同事使用的一键脚本 + 自动化测试 + 完整文档。
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![opencodex](https://img.shields.io/badge/opencodex-%3E%3D2.10.1-green)](https://github.com/anthropics/opencodex)
-[![Tests](https://img.shields.io/badge/tests-17%2F17%20passed-brightgreen)](tests/)
+[![Tests](https://img.shields.io/badge/tests-15%2F19%20passed-brightgreen)](tests/)
 
 ## 这是什么？
 
@@ -21,8 +21,8 @@
 flowchart LR
     subgraph LAN[办公室局域网]
         Server[你的电脑<br/>192.168.1.110:10100<br/>opencodex 代理]
-        ClientA[同事 A<br/>Codex Desktop]
-        ClientB[同事 B<br/>Codex CLI]
+        ClientA[同事 A<br/>opencodex]
+        ClientB[同事 B<br/>opencodex]
     end
 
     ClientA -->|"所有 API 请求"| Server
@@ -32,11 +32,21 @@ flowchart LR
     Server -->|"qwen-cloud/*"| Aliyun[阿里云百炼]
 ```
 
-**一句话原理**：opencodex 是一个运行在你机器上的 HTTP 代理（端口 10100），同事把 Codex 的 `openai_base_url` 指向你的 IP，所有模型请求经过代理自动路由到对应的云服务商。
+**一句话原理**：opencodex 是一个运行在你机器上的 HTTP 代理（端口 10100），同事的 opencodex 把 `base_url` 指向你的 IP，所有模型请求经过代理自动路由到对应的云服务商。
+
+## 前置条件
+
+| 角色 | 要求 |
+|------|------|
+| 服务端 | Windows 11 + opencodex v2.10.1+ + 管理员权限 |
+| 客户端 | 任意操作系统 + **opencodex（脚本自动安装）** + Node.js（脚本自动安装） |
+| 网络 | 所有机器在同一局域网子网内 |
+
+> **重要**：同事机器上必须安装 opencodex，否则 `config.toml` 中的 `model_provider = "opencodex"` 等配置项无法被识别，模型列表不会更新。客户端脚本已内置自动安装逻辑——只需确保同事机器能访问 npm registry。
 
 ## 快速开始
 
-### 第一步：服务端配置（你的机器，2 分钟）
+### 第一步：服务端配置（你的机器）
 
 ```powershell
 # 右键 PowerShell → 以管理员身份运行
@@ -68,7 +78,7 @@ cd D:\Project\opencodex-lan-share
 
 #### 方式一：一键命令（推荐，无需下载任何东西）
 
-> 管理员先把**服务器 IP** 和 **访问密钥** 发给同事。
+> 管理员先把**服务器 IP** 和**访问密钥** 发给同事。
 
 **Windows 同事：** 打开 PowerShell，粘贴运行（把 `IP` 和 `密钥` 替换为实际值）：
 
@@ -99,6 +109,14 @@ curl -fsSL https://raw.githubusercontent.com/orulink-ai/opencodex-lan-share/main
 
 打开 Codex Desktop，模型选择器里就能看到所有模型了（`qwen-cloud/*`、`deepseek/*` 等），选一个直接用。不需要输入任何 API Key。
 
+> **脚本会自动完成以下操作：**
+> 1. 检测并安装 Node.js（如未安装）
+> 2. 检测并安装 opencodex（`npm install -g opencodex`）
+> 3. 测试与服务器的连通性
+> 4. 配置 `~/.codex/config.toml`（设置 `base_url`、`model_provider` 等）
+> 5. 设置 `OPENAI_API_KEY` 环境变量
+> 6. 验证 opencodex 能正确读取配置
+
 ## 项目结构
 
 ```
@@ -112,18 +130,25 @@ opencodex-lan-share/
 ├── scripts/                        # 脚本
 │   ├── server/                     # 服务端（你的机器）
 │   │   ├── setup-lan.ps1           # 一键配置（防火墙 + 服务 + 密钥）
-│   │   └── manage-users.ps1        # 同事密钥管理（增删查）
+│   │   ├── setup-lan.sh            # macOS/Linux 服务端
+│   │   ├── auth-proxy.py           # 认证转发代理
+│   │   ├── manage-users.ps1        # 同事密钥管理（增删查）
+│   │   └── manage-users.sh         # macOS/Linux 密钥管理
 │   └── client/                     # 客户端（同事的机器）
-│       ├── setup-client.ps1        # Windows 一键接入
-│       └── setup-client.sh         # macOS/Linux 一键接入
+│       ├── setup-client.ps1        # Windows 一键接入（含自动安装 opencodex）
+│       └── setup-client.sh         # macOS/Linux 一键接入（含自动安装 opencodex）
 ├── tests/                          # 自动化测试（TDD）
 │   ├── test-connectivity.ps1       # 连通性测试 6 项
 │   ├── test-models.ps1             # 模型可用性测试 6 项
-│   └── test-stream.ps1             # 流式输出测试 5 项
+│   ├── test-stream.ps1             # 流式输出测试 5 项
+│   ├── test-client-windows.ps1     # Windows 客户端配置测试 19 项
+│   ├── test-client-macos.sh        # macOS 客户端配置测试
+│   └── test-server-macos.sh        # macOS 服务端测试
 ├── templates/                      # 配置模板
 │   └── client-config.toml          # 客户端 Codex 配置模板
 └── tools/                          # 工具
-    └── diagnostics.ps1             # 双向诊断工具（服务端/客户端通用）
+    ├── diagnostics.ps1             # 双向诊断工具（服务端/客户端通用）
+    └── diagnostics.sh              # macOS/Linux 诊断工具
 ```
 
 ## 运行测试
@@ -136,6 +161,9 @@ opencodex-lan-share/
 
 # 客户端连通性测试
 .\tests\test-connectivity.ps1 -ServerIp 192.168.1.110
+
+# Windows 客户端配置测试（TDD）
+.\tests\test-client-windows.ps1
 ```
 
 ## 常用管理命令
@@ -155,18 +183,13 @@ opencodex-lan-share/
 .\tools\diagnostics.ps1 -ServerIp 192.168.1.110   # 客户端诊断
 ```
 
-## 前置条件
-
-| 角色 | 要求 |
-|------|------|
-| 服务端 | Windows 11 + opencodex v2.10.1+ + 管理员权限 |
-| 客户端 | 任意操作系统 + Codex Desktop 或 Codex CLI |
-| 网络 | 所有机器在同一局域网子网内 |
-
 ## 常见问题
 
 **Q: 同事能看到我的 API Key 吗？**
 A: **不能。** 你的阿里云百炼、DeepSeek 等 API Key 只存在 `~/.opencodex/config.json` 里，永远不会传给同事的机器。
+
+**Q: 同事打开 Codex 后模型列表不更新怎么办？**
+A: 99% 的情况是同事机器上没有安装 opencodex。请让同事重新运行客户端脚本（脚本会自动检测并安装），或手动执行 `npm install -g opencodex`，然后完全退出 Codex Desktop 再重新打开。
 
 **Q: 费用算谁的？**
 A: **你的。** 所有通过代理的 API 调用都走你的账户计费。建议在阿里云百炼控制台设置预算告警。
