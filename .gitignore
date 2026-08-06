@@ -26,3 +26,4 @@ test-results/
 .idea/
 *.swp
 *.swo
+setup.ps1
