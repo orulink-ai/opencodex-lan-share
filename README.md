@@ -1,130 +1,193 @@
 # opencodex LAN Share
 
-> 一套脚本和文档，将本机 opencodex 代理共享给办公室局域网内的同事使用。
+> 将本机 opencodex 代理共享给办公室局域网内同事使用的一键脚本 + 自动化测试 + 完整文档。
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![opencodex](https://img.shields.io/badge/opencodex-%3E%3D2.10.1-green)](https://github.com/anthropics/opencodex)
+[![Tests](https://img.shields.io/badge/tests-17%2F17%20passed-brightgreen)](tests/)
 
 ## 这是什么？
 
-opencodex 是一个多模型路由代理。本仓库提供：
-- **服务端脚本**：一键配置防火墙、服务、访问密钥
-- **客户端脚本**：同事一键接入你的代理
-- **自动化测试**：17 项 TDD 测试覆盖连通性、模型、流式输出
-- **完整文档**：架构原理、故障排查、安全指南
+你在本机用 opencodex 接入了阿里云百炼（qwen-cloud）、DeepSeek 等多个模型供应商。这个项目让你**一键把代理共享给办公室同事**——同事的 Codex 发请求到你的机器，你的机器用你的 API Key 去调模型，然后把结果返回。
 
-## 架构一览
+- 同事**看不到**你的 API Key
+- 费用统一走你的账户，方便管理
+- 随时可以**单条命令吊销**某个人的访问权限
+- 支持 Windows / macOS / Linux 客户端
+
+## 架构
 
 ```mermaid
 flowchart LR
-    subgraph 办公室局域网
-        Server[你的电脑<br/>192.168.1.110<br/>opencodex :10100]
-        ClientA[同事A<br/>Codex Desktop]
-        ClientB[同事B<br/>Codex Desktop]
+    subgraph LAN[办公室局域网]
+        Server[你的电脑<br/>192.168.1.110:10100<br/>opencodex 代理]
+        ClientA[同事 A<br/>Codex Desktop]
+        ClientB[同事 B<br/>Codex CLI]
     end
 
-    ClientA -->|openai_base_url| Server
-    ClientB -->|openai_base_url| Server
-    Server -->|GPT| OpenAI[api.openai.com]
-    Server -->|DeepSeek| DS[api.deepseek.com]
-    Server -->|Qwen| Aliyun[maas.aliyuncs.com]
+    ClientA -->|"所有 API 请求"| Server
+    ClientB -->|"所有 API 请求"| Server
+    Server -->|"gpt-*"| OpenAI[OpenAI]
+    Server -->|"deepseek/*"| DeepSeek[DeepSeek]
+    Server -->|"qwen-cloud/*"| Aliyun[阿里云百炼]
 ```
 
-**核心原理**：同事的 Codex 把 API 请求发到你机器的 opencodex 代理，代理根据模型名路由到对应的云服务商，使用**你的** API Key 完成调用。同事全程看不到你的密钥。
+**一句话原理**：opencodex 是一个运行在你机器上的 HTTP 代理（端口 10100），同事把 Codex 的 `openai_base_url` 指向你的 IP，所有模型请求经过代理自动路由到对应的云服务商。
 
 ## 快速开始
 
-### 服务端（你的机器） — 2 分钟
+### 第一步：服务端配置（你的机器，2 分钟）
 
 ```powershell
-# 1. 以管理员身份打开 PowerShell
-# 2. 运行配置脚本
+# 右键 PowerShell → 以管理员身份运行
+cd D:\Project\opencodex-lan-share
+
+# 一键配置：防火墙放行 + 代理启动 + 开机服务
 .\scripts\server\setup-lan.ps1
 
-# 3. 创建同事的访问密钥
+# 为同事创建访问密钥
 .\scripts\server\manage-users.ps1 -Create "张三"
 ```
 
 记下输出的密钥和你的局域网 IP（如 `192.168.1.110`）。
 
-### 客户端（同事的机器） — 1 分钟
+### 第二步：同事接入
 
-将以下信息发给同事：
-- 代理地址：`http://192.168.1.110:10100/v1`
-- 本仓库的 `scripts\client\` 目录
+发给同事的话术模板：
 
-同事运行：
+> 办公室部署了共享 AI 代理，你只需要在电脑上跑一条命令就能用上 qwen / deepseek 等模型。打开 PowerShell（不是 CMD），复制下面这行，回车：
+
+#### 方式一：一键命令（推荐，无需下载任何东西）
+
+**Windows 同事：** 打开 PowerShell，粘贴运行：
 
 ```powershell
-.\scripts\client\setup-client.ps1 -ServerIp 192.168.1.110
+powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr -Uri 'https://raw.githubusercontent.com/orulink-ai/opencodex-lan-share/main/scripts/client/setup-client.ps1' -OutFile 'setup-client.ps1'; .\setup-client.ps1 -ServerIp 192.168.1.110"
 ```
 
-配置完成后，打开 Codex Desktop，在模型选择器中就能看到所有可用模型（包括 qwen-cloud/*、deepseek/* 等）。
+> ⚠️ 把 `192.168.1.110` 换成你的实际局域网 IP。
+
+**macOS / Linux 同事：** 打开终端，粘贴运行：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/orulink-ai/opencodex-lan-share/main/scripts/client/setup-client.sh | bash -s -- 192.168.1.110
+```
+
+> ⚠️ 把 `192.168.1.110` 换成你的实际局域网 IP。
+
+#### 方式二：手动下载（如果 GitHub 访问不了）
+
+1. 让同事浏览器打开：`https://github.com/orulink-ai/opencodex-lan-share`
+2. 点绿色 `Code` 按钮 → `Download ZIP`
+3. 解压后进入 `scripts\client\` 目录
+4. Windows：右键 `setup-client.ps1` → 使用 PowerShell 运行，输入服务器 IP
+5. Mac/Linux：`bash setup-client.sh 192.168.1.110`
+
+#### 配置完成后
+
+打开 Codex Desktop，模型选择器里就能看到所有模型了（`qwen-cloud/*`、`deepseek/*` 等），选一个直接用。不需要输入任何 API Key。
 
 ## 项目结构
 
 ```
 opencodex-lan-share/
 ├── README.md                       # 本文件
-├── docs/
-│   ├── architecture.md             # 架构原理（Mermaid 图）
-│   ├── troubleshooting.md          # 常见问题排查
-│   └── security.md                 # 安全说明
-├── scripts/
-│   ├── server/
-│   │   ├── setup-lan.ps1           # 服务端一键配置
-│   │   └── manage-users.ps1        # 用户密钥管理
-│   └── client/
-│       ├── setup-client.ps1        # Windows 客户端配置
-│       └── setup-client.sh         # macOS/Linux 客户端配置
-├── tests/
-│   ├── test-connectivity.ps1       # 连通性测试（6 项）
-│   ├── test-models.ps1             # 模型可用性测试（6 项）
-│   └── test-stream.ps1             # 流式输出测试（5 项）
-├── templates/
-│   └── client-config.toml          # 客户端配置模板
-└── tools/
-    └── diagnostics.ps1             # 双向诊断工具
+├── LICENSE                         # MIT 开源协议
+├── docs/                           # 文档
+│   ├── architecture.md             # 架构原理（Mermaid 流程图）
+│   ├── troubleshooting.md          # 常见问题排查指南
+│   └── security.md                 # 安全说明与最佳实践
+├── scripts/                        # 脚本
+│   ├── server/                     # 服务端（你的机器）
+│   │   ├── setup-lan.ps1           # 一键配置（防火墙 + 服务 + 密钥）
+│   │   └── manage-users.ps1        # 同事密钥管理（增删查）
+│   └── client/                     # 客户端（同事的机器）
+│       ├── setup-client.ps1        # Windows 一键接入
+│       └── setup-client.sh         # macOS/Linux 一键接入
+├── tests/                          # 自动化测试（TDD）
+│   ├── test-connectivity.ps1       # 连通性测试 6 项
+│   ├── test-models.ps1             # 模型可用性测试 6 项
+│   └── test-stream.ps1             # 流式输出测试 5 项
+├── templates/                      # 配置模板
+│   └── client-config.toml          # 客户端 Codex 配置模板
+└── tools/                          # 工具
+    └── diagnostics.ps1             # 双向诊断工具（服务端/客户端通用）
 ```
 
-## 测试
+## 运行测试
 
 ```powershell
-# 服务端测试
+# 服务端全量测试
 .\tests\test-connectivity.ps1
-.\tests\test-models.ps1 -AccessKey <key>
-.\tests\test-stream.ps1 -AccessKey <key>
+.\tests\test-models.ps1 -AccessKey <你的访问密钥>
+.\tests\test-stream.ps1 -AccessKey <你的访问密钥>
 
-# 客户端测试
+# 客户端连通性测试
 .\tests\test-connectivity.ps1 -ServerIp 192.168.1.110
+```
+
+## 常用管理命令
+
+```powershell
+# 查看所有同事的密钥
+.\scripts\server\manage-users.ps1 -List
+
+# 创建新同事密钥
+.\scripts\server\manage-users.ps1 -Create "李四"
+
+# 吊销某个密钥（同事离职/滥用时）
+.\scripts\server\manage-users.ps1 -Revoke <密钥ID>
+
+# 诊断问题
+.\tools\diagnostics.ps1
+.\tools\diagnostics.ps1 -ServerIp 192.168.1.110   # 客户端诊断
 ```
 
 ## 前置条件
 
-- **服务端**：Windows 11 + opencodex v2.10.1+
-- **客户端**：任何操作系统 + Codex Desktop 或 Codex CLI
-- **网络**：所有机器在同一局域网（同一子网）
-
-## 文档
-
-- [架构原理](docs/architecture.md)
-- [故障排查](docs/troubleshooting.md)
-- [安全指南](docs/security.md)
+| 角色 | 要求 |
+|------|------|
+| 服务端 | Windows 11 + opencodex v2.10.1+ + 管理员权限 |
+| 客户端 | 任意操作系统 + Codex Desktop 或 Codex CLI |
+| 网络 | 所有机器在同一局域网子网内 |
 
 ## 常见问题
 
 **Q: 同事能看到我的 API Key 吗？**
-A: 不能。API Key 只存在你机器的 `~/.opencodex/config.json` 里，不会传给同事。
+A: **不能。** 你的阿里云百炼、DeepSeek 等 API Key 只存在 `~/.opencodex/config.json` 里，永远不会传给同事的机器。
 
 **Q: 费用算谁的？**
-A: 你的。所有通过代理的请求都使用你的阿里云百炼、DeepSeek 等账户计费。
+A: **你的。** 所有通过代理的 API 调用都走你的账户计费。建议在阿里云百炼控制台设置预算告警。
 
 **Q: 如何吊销某个同事的访问权限？**
-A: `.\scripts\server\manage-users.ps1 -Revoke <key-id>`
+A: `.\scripts\server\manage-users.ps1 -Revoke <密钥ID>`，即时生效。
 
-**Q: 电脑关机后还能用吗？**
-A: 不能。你的机器需要一直开着。建议运行 `setup-lan.ps1` 安装后台服务（开机自启）。
+**Q: 你的电脑关机了还能用吗？**
+A: **不能。** 代理在你机器上运行，关机就断了。建议运行 `setup-lan.ps1` 安装 Windows 服务（开机自启）。
+
+**Q: 能支持多少个同事同时用？**
+A: 取决于你的 API 账户的并发限制（阿里云百炼默认有 QPS 限制）。一般 5-10 人没问题。
+
+**Q: 代理和 Codex Desktop 能同时在你机器上用吗？**
+A: **能。** 你自己用 `127.0.0.1:10100`，同事用 `192.168.1.110:10100`，互不影响。
+
+**Q: 安全吗？**
+A: 代理走 **HTTP 明文**（局域网内），适合**可信办公网络**。不要做公网端口映射。如果需要外网访问，建议用 Tailscale 组虚拟局域网。详见[安全指南](docs/security.md)。
+
+## 更多文档
+
+- [架构原理详解 →](docs/architecture.md)
+- [故障排查指南 →](docs/troubleshooting.md)
+- [安全最佳实践 →](docs/security.md)
+
+## 参与贡献
+
+1. Fork 本仓库
+2. 创建功能分支 (`git checkout -b feat/xxx`)
+3. 提交修改 (`git commit -m 'feat: 添加xxx功能'`)
+4. 推送到分支 (`git push origin feat/xxx`)
+5. 提交 Pull Request
 
 ## License
 
-MIT
+MIT © orulink
