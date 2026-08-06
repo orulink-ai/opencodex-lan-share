@@ -4,6 +4,7 @@ opencodex LAN Share - 认证转发代理
 
 用法: python auth-proxy.py [--port 10101] [--target http://127.0.0.1:10100]
 """
+import logging
 import http.server
 import urllib.request
 import urllib.error
@@ -11,8 +12,6 @@ import json
 import sys
 import os
 import argparse
-import logging
-
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%H:%M:%S')
 log = logging.getLogger('auth-proxy')
 
@@ -33,6 +32,7 @@ def load_valid_keys():
     return keys
 
 VALID_KEYS = set()
+CATALOG_PATH = None  # Set by main()
 
 class AuthProxy(http.server.ThreadingHTTPServer):
     allow_reuse_address = True
@@ -106,7 +106,37 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             log.error(f"Proxy error: {e}")
             self.send_error(502, f"Proxy error: {e}")
 
-    def do_GET(self):    self.do_request("GET")
+    def serve_catalog(self):
+        """Serve the opencodex model catalog JSON file (auth required)."""
+        global VALID_KEYS
+        auth_header = self.headers.get("Authorization", "")
+        client_key = ""
+        if auth_header.startswith("Bearer "):
+            client_key = auth_header[7:].strip()
+        if not client_key or client_key not in VALID_KEYS:
+            self.send_error(401, "Invalid or missing API key")
+            return
+        if not CATALOG_PATH or not os.path.exists(CATALOG_PATH):
+            self.send_error(503, "Catalog not available on server")
+            return
+        try:
+            with open(CATALOG_PATH, encoding="utf-8") as cf:
+                catalog_data = cf.read()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(catalog_data.encode("utf-8"))))
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            self.wfile.write(catalog_data.encode("utf-8"))
+        except Exception as e:
+            log.error(f"Catalog read error: {e}")
+            self.send_error(500, f"Catalog read error: {e}")
+
+    def do_GET(self):
+        if self.path == "/catalog.json":
+            self.serve_catalog()
+        else:
+            self.do_request("GET")
     def do_POST(self):   self.do_request("POST")
     def do_PUT(self):    self.do_request("PUT")
     def do_DELETE(self): self.do_request("DELETE")
@@ -128,8 +158,9 @@ def main():
     parser.add_argument("--target", type=str, default="http://127.0.0.1:10100")
     args = parser.parse_args()
 
-    global VALID_KEYS
+    global VALID_KEYS, CATALOG_PATH
     VALID_KEYS = load_valid_keys()
+    CATALOG_PATH = os.path.join(os.path.expanduser("~"), ".codex", "opencodex-catalog.json")
 
     # 从 target URL 解析 host/port
     target = args.target.replace("http://", "").replace("https://", "")
@@ -142,6 +173,7 @@ def main():
     server = AuthProxy(("0.0.0.0", args.port), ProxyHandler)
     log.info(f"Auth proxy listening on 0.0.0.0:{args.port} -> {args.target}")
     log.info(f"Valid keys loaded: {len(VALID_KEYS)}")
+    log.info(f"Catalog path: {CATALOG_PATH}")
 
     # 定期刷新 key 列表（每 60 秒）
     import threading

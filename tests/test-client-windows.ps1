@@ -264,6 +264,22 @@ if ($scriptContent -match 'backup|Copy-Item.*backup|Move-Item.*backup') {
 # ============================================================
 if ($scriptContent -match 'Troubleshooting|troubleshoot|Cannot reach|unable to connect') {
     Write-TestResult "TC-CLIENT-WIN-10" "Script has helpful error messages" $true ""
+
+# TC-CLIENT-WIN-11: Script downloads model catalog
+try {
+    $catalogOk = (Select-String -Path $SetupClient -Pattern "catalog.json" -SimpleMatch)
+    $hasCatalogConfig = (Select-String -Path $SetupClient -Pattern "model_catalog_json" -SimpleMatch)
+    if ($catalogOk -and $hasCatalogConfig) {
+        Write-TestResult "TC-CLIENT-WIN-11" "Script downloads and configures model catalog" $true ""
+    } else {
+        $missing = @()
+        if (-not $catalogOk) { $missing += "missing catalog download" }
+        if (-not $hasCatalogConfig) { $missing += "missing model_catalog_json config" }
+        Write-TestResult "TC-CLIENT-WIN-11" "Script downloads and configures model catalog" $false ($missing -join ", ")
+    }
+} catch {
+    Write-TestResult "TC-CLIENT-WIN-11" "Script downloads and configures model catalog" $false $_.Exception.Message
+}
 } else {
     Write-TestResult "TC-CLIENT-WIN-10" "Script has helpful error messages" $false "No troubleshooting info found"
 }

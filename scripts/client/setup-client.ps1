@@ -174,9 +174,42 @@ try {
 Write-Host ""
 
 # ============================================================
+# Step 2.5: Download model catalog
+# ============================================================
+Write-Host "[2.5/5] Downloading model catalog..." -ForegroundColor Yellow
+
+$catalogPath = Join-Path $ConfigDir "opencodex-catalog.json"
+$catalogOk = $false
+
+try {
+    $catalogHeaders = @{"Authorization" = "Bearer " + $AccessKey}
+    $catalogData = Invoke-RestMethod -Uri ($BaseUrl + "/catalog.json") -Method Get -Headers $catalogHeaders -TimeoutSec 30 -ErrorAction Stop
+    if ($catalogData.models) {
+        $catalogJson = $catalogData | ConvertTo-Json -Depth 10 -Compress
+        [System.IO.File]::WriteAllText($catalogPath, $catalogJson, [System.Text.Encoding]::UTF8)
+        $modelCount = @($catalogData.models).Count
+        Write-Host ("  [OK] Downloaded catalog with " + $modelCount + " models")
+        $catalogOk = $true
+    } else {
+        Write-Host "  [WARN] Catalog response has no models field" -ForegroundColor Yellow
+    }
+} catch {
+    $catalogMsg = $_.Exception.Message
+    if ($catalogMsg -match "404") {
+        Write-Host "  [WARN] Catalog endpoint not available on server (auth-proxy may need update)" -ForegroundColor Yellow
+        Write-Host "         The server admin should update auth-proxy.py to the latest version."
+    } else {
+        Write-Host ("  [WARN] Catalog download failed: " + $catalogMsg) -ForegroundColor Yellow
+        Write-Host "         Models may not appear in Codex Desktop until this is resolved."
+    }
+}
+
+Write-Host ""
+
+# ============================================================
 # Step 3: Configure Codex
 # ============================================================
-Write-Host "[3/5] Configuring Codex..." -ForegroundColor Yellow
+Write-Host "[3/6] Configuring Codex..." -ForegroundColor Yellow
 
 # Backup existing config
 if (Test-Path $ConfigPath) {
@@ -215,12 +248,18 @@ foreach ($line in $lines) {
             $newLines += ""
             $newLines += "# === opencodex LAN Share ==="
             $newLines += "base_url = """ + $BaseUrl + "/v1"""
+            if ($catalogOk) {
+                $newLines += "model_catalog_json = """ + $catalogPath.Replace("", "\") + """"
+            }
             $newLines += "model_provider = ""opencodex"""
             $newLines += "wire_api = ""responses"""
             $newLines += ""
             $newLines += "[model_providers.opencodex]"
             $newLines += "name = ""OpenCodex Proxy (" + $ServerIp + ")"""
             $newLines += "base_url = """ + $BaseUrl + "/v1"""
+            if ($catalogOk) {
+                $newLines += "model_catalog_json = """ + $catalogPath.Replace("", "\") + """"
+            }
             $newLines += "wire_api = ""responses"""
             $newLines += "requires_openai_auth = true"
             $newLines += "# ============================"
@@ -236,12 +275,18 @@ if (-not $injected) {
     $newLines += ""
     $newLines += "# === opencodex LAN Share ==="
     $newLines += "base_url = """ + $BaseUrl + "/v1"""
+            if ($catalogOk) {
+                $newLines += "model_catalog_json = """ + $catalogPath.Replace("", "\") + """"
+            }
     $newLines += "model_provider = ""opencodex"""
     $newLines += "wire_api = ""responses"""
     $newLines += ""
     $newLines += "[model_providers.opencodex]"
     $newLines += "name = ""OpenCodex Proxy (" + $ServerIp + ")"""
     $newLines += "base_url = """ + $BaseUrl + "/v1"""
+            if ($catalogOk) {
+                $newLines += "model_catalog_json = """ + $catalogPath.Replace("", "\") + """"
+            }
     $newLines += "wire_api = ""responses"""
     $newLines += "requires_openai_auth = true"
     $newLines += "# ============================"
@@ -260,7 +305,7 @@ Write-Host ""
 # ============================================================
 # Step 4: Set API key
 # ============================================================
-Write-Host "[4/5] Setting API key..." -ForegroundColor Yellow
+Write-Host "[4/6] Setting API key..." -ForegroundColor Yellow
 
 $envSet = $false
 try {
@@ -285,7 +330,7 @@ Write-Host ""
 # ============================================================
 # Step 5: Verify opencodex can read config
 # ============================================================
-Write-Host "[5/5] Verifying opencodex configuration..." -ForegroundColor Yellow
+Write-Host "[5/6] Verifying opencodex configuration..." -ForegroundColor Yellow
 
 if ($ocxOk) {
     try {

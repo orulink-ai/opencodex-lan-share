@@ -141,6 +141,24 @@ if ($ServerIp -eq "127.0.0.1") {
     Write-TestResult "TC-CONN-06" "Binding check (server-side only)" $true "Client mode, skipped"
 }
 
+# TC-CONN-07: Catalog endpoint
+if ($AccessKey) {
+    try {
+        $catalogHeaders = @{"Authorization" = "Bearer " + $AccessKey}
+        $catalogResult = Invoke-RestMethod -Uri ($BaseUrl + "/catalog.json") -Method Get -Headers $catalogHeaders -TimeoutSec 10 -ErrorAction Stop
+        if ($catalogResult.models) {
+            $modelCount = @($catalogResult.models).Count
+            Write-TestResult "TC-CONN-07" ("Catalog endpoint (" + $modelCount + " models)") $true ""
+        } else {
+            Write-TestResult "TC-CONN-07" "Catalog endpoint" $false "Response has no models field"
+        }
+    } catch {
+        Write-TestResult "TC-CONN-07" "Catalog endpoint" $false ("Request failed - " + $_.Exception.Message)
+    }
+} else {
+    Write-TestResult "TC-CONN-07" "Catalog endpoint" $false "AccessKey required"
+}
+
 # Summary
 Write-Host ""
 Write-Host "=== Results ===" -ForegroundColor Cyan
