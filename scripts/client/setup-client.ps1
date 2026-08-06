@@ -249,7 +249,7 @@ foreach ($line in $lines) {
             $newLines += "# === opencodex LAN Share ==="
             $newLines += "base_url = """ + $BaseUrl + "/v1"""
             if ($catalogOk) {
-                $newLines += "model_catalog_json = """ + $catalogPath.Replace("\", "\\") + """"
+                $newLines += "model_catalog_json = '" + $catalogPath + "'"
             }
             $newLines += "model_provider = ""opencodex"""
             $newLines += "wire_api = ""responses"""
@@ -258,7 +258,7 @@ foreach ($line in $lines) {
             $newLines += "name = ""OpenCodex Proxy (" + $ServerIp + ")"""
             $newLines += "base_url = """ + $BaseUrl + "/v1"""
             if ($catalogOk) {
-                $newLines += "model_catalog_json = """ + $catalogPath.Replace("\", "\\") + """"
+                $newLines += "model_catalog_json = '" + $catalogPath + "'"
             }
             $newLines += "wire_api = ""responses"""
             $newLines += "requires_openai_auth = true"
@@ -276,7 +276,7 @@ if (-not $injected) {
     $newLines += "# === opencodex LAN Share ==="
     $newLines += "base_url = """ + $BaseUrl + "/v1"""
             if ($catalogOk) {
-                $newLines += "model_catalog_json = """ + $catalogPath.Replace("\", "\\") + """"
+                $newLines += "model_catalog_json = '" + $catalogPath + "'"
             }
     $newLines += "model_provider = ""opencodex"""
     $newLines += "wire_api = ""responses"""
@@ -285,7 +285,7 @@ if (-not $injected) {
     $newLines += "name = ""OpenCodex Proxy (" + $ServerIp + ")"""
     $newLines += "base_url = """ + $BaseUrl + "/v1"""
             if ($catalogOk) {
-                $newLines += "model_catalog_json = """ + $catalogPath.Replace("\", "\\") + """"
+                $newLines += "model_catalog_json = '" + $catalogPath + "'"
             }
     $newLines += "wire_api = ""responses"""
     $newLines += "requires_openai_auth = true"
