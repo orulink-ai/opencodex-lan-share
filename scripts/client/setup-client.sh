@@ -87,23 +87,56 @@ echo -e "  ${GREEN}[OK]${NC} 配置已更新"
 echo -e "       ${GREEN}✓${NC} base_url = ${BASE_URL}/v1"
 echo -e "       ${GREEN}✓${NC} 使用标准 OpenAI 协议（不设 model_provider）"
 
-# Step 4: 环境变量
+# Step 4: 环境变量（macOS 特殊处理）
 echo -e "${YELLOW}[4/4] 设置密钥...${NC}"
 
-SHELL_RC=""
-for f in "${HOME}/.zshrc" "${HOME}/.bashrc" "${HOME}/.bash_profile"; do
-    [ -f "$f" ] && SHELL_RC="$f" && break
-done
+if [ "$(uname)" = "Darwin" ] 2>/dev/null; then
+    # macOS: GUI 应用不继承 shell rc，必须用 launchctl
+    launchctl setenv OPENAI_API_KEY "${ACCESS_KEY}"
+    echo -e "  ${GREEN}[OK]${NC} 已通过 launchctl 设置（所有应用可见）"
 
-if [ -n "$SHELL_RC" ]; then
-    sed -i.bak '/^export OPENAI_API_KEY=/d' "$SHELL_RC" 2>/dev/null || true
-    sed -i.bak '/^export OPENCODEX_OPENCODE_API_KEY=/d' "$SHELL_RC" 2>/dev/null || true
-    rm -f "${SHELL_RC}.bak"
-    echo "export OPENAI_API_KEY=\"${ACCESS_KEY}\"" >> "$SHELL_RC"
-    echo -e "  ${GREEN}[OK]${NC} 已写入 ${SHELL_RC}"
-    echo -e "  ${YELLOW}[提示]${NC} 运行 'source ${SHELL_RC}' 或新开终端生效"
+    # 创建 LaunchAgent 确保重启后也生效
+    PLIST_DIR="${HOME}/Library/LaunchAgents"
+    PLIST_FILE="${PLIST_DIR}/com.opencodex.lan-share.plist"
+    mkdir -p "$PLIST_DIR"
+    cat > "$PLIST_FILE" << PLISTEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.opencodex.lan-share</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/launchctl</string>
+        <string>setenv</string>
+        <string>OPENAI_API_KEY</string>
+        <string>${ACCESS_KEY}</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>
+PLISTEOF
+    launchctl load "$PLIST_FILE" 2>/dev/null || true
+    echo -e "  ${GREEN}[OK]${NC} 已创建 LaunchAgent（重启后自动生效）"
 else
-    echo -e "  ${YELLOW}[提示]${NC} 请手动设置: export OPENAI_API_KEY=\"${ACCESS_KEY}\""
+    # Linux: 写入 shell rc
+    SHELL_RC=""
+    for f in "${HOME}/.zshrc" "${HOME}/.bashrc" "${HOME}/.bash_profile"; do
+        [ -f "$f" ] && SHELL_RC="$f" && break
+    done
+
+    if [ -n "$SHELL_RC" ]; then
+        sed -i.bak '/^export OPENAI_API_KEY=/d' "$SHELL_RC" 2>/dev/null || true
+        sed -i.bak '/^export OPENCODEX_OPENCODE_API_KEY=/d' "$SHELL_RC" 2>/dev/null || true
+        rm -f "${SHELL_RC}.bak"
+        echo "export OPENAI_API_KEY=\"${ACCESS_KEY}\"" >> "$SHELL_RC"
+        echo -e "  ${GREEN}[OK]${NC} 已写入 ${SHELL_RC}"
+        echo -e "  ${YELLOW}[提示]${NC} 运行 'source ${SHELL_RC}' 或新开终端生效"
+    else
+        echo -e "  ${YELLOW}[提示]${NC} 请手动设置: export OPENAI_API_KEY=\"${ACCESS_KEY}\""
+    fi
 fi
 
 # 完成
