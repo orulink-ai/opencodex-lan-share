@@ -285,6 +285,74 @@ try {
 }
 
 # ============================================================
+# TC-CLIENT-WIN-12: Script refreshes Codex models_cache via ocx sync-cache
+# Root cause: Codex Desktop reads ~/.codex/models_cache.json (not /v1/models
+# dynamically). Writing the catalog alone does NOT refresh the model list unless
+# the cache is invalidated (fetched_at forced to 2000-01-01). opencodex does this
+# via `ocx sync-cache`. The old script never ran it, so the colleague's list stayed stale.
+# ============================================================
+$hasSyncCache = (Select-String -Path $SetupClient -Pattern "sync-cache" -SimpleMatch)
+if ($hasSyncCache) {
+    Write-TestResult "TC-CLIENT-WIN-12" "Script runs ocx sync-cache to refresh Codex model cache" $true ""
+} else {
+    Write-TestResult "TC-CLIENT-WIN-12" "Script runs ocx sync-cache to refresh Codex model cache" $false "setup-client.ps1 never invalidates models_cache.json, so Codex Desktop keeps showing stale models"
+}
+
+# ============================================================
+# TC-CLIENT-WIN-13: Script does NOT start a local proxy (must route through LAN server)
+# We must only refresh the cache, never `ocx start`/`ocx ensure` (which would spawn a
+# local proxy and may overwrite base_url). Verify no local-proxy start is introduced
+# in the sync-cache step.
+# ============================================================
+if ($hasSyncCache) {
+    # Locate the sync-cache block and ensure it does not call start/proxy
+    $scriptLines = Get-Content $SetupClient
+    $syncIdx = ($scriptLines | Select-String -Pattern "sync-cache" | Select-Object -First 1).LineNumber
+    $blockStart = $syncIdx - 12
+    if ($blockStart -lt 0) { $blockStart = 0 }
+    $blockEnd = $syncIdx + 12
+    if ($blockEnd -gt $scriptLines.Count) { $blockEnd = $scriptLines.Count }
+    $block = ($scriptLines[$blockStart..($blockEnd-1)] -join "`n")
+    if ($block -match "ocx start|ocx ensure|ocx service") {
+        Write-TestResult "TC-CLIENT-WIN-13" "Cache refresh does not start a local proxy" $false "sync-cache block also starts a local proxy - would break LAN routing"
+    } else {
+        Write-TestResult "TC-CLIENT-WIN-13" "Cache refresh does not start a local proxy" $true ""
+    }
+} else {
+    Write-TestResult "TC-CLIENT-WIN-13" "Cache refresh does not start a local proxy" $false "sync-cache block not found (skipped)"
+}
+
+# ============================================================
+# TC-CLIENT-WIN-14: Cache refresh respects DryRun (must NOT mutate real cache in preview)
+# ============================================================
+if ($hasSyncCache) {
+    $scriptLines = Get-Content $SetupClient
+    $syncIdx = ($scriptLines | Select-String -Pattern "sync-cache" | Select-Object -First 1).LineNumber
+    $blockStart = $syncIdx - 12
+    if ($blockStart -lt 0) { $blockStart = 0 }
+    $blockEnd = $syncIdx + 12
+    if ($blockEnd -gt $scriptLines.Count) { $blockEnd = $scriptLines.Count }
+    $block = ($scriptLines[$blockStart..($blockEnd-1)] -join "`n")
+    if ($block -match '-not \$DryRun') {
+        Write-TestResult "TC-CLIENT-WIN-14" "Cache refresh is gated by DryRun guard" $true ""
+    } else {
+        Write-TestResult "TC-CLIENT-WIN-14" "Cache refresh is gated by DryRun guard" $false "sync-cache runs even in DryRun preview mode - would mutate real models_cache.json"
+    }
+} else {
+    Write-TestResult "TC-CLIENT-WIN-14" "Cache refresh is gated by DryRun guard" $false "sync-cache block not found"
+}
+
+# ============================================================
+# TC-CLIENT-WIN-15: Fallback removes stale models_cache.json when sync-cache fails
+# ============================================================
+$psContent = Get-Content $SetupClient -Raw
+if ($psContent -match 'modelsCachePath|models_cache\.json' -and $psContent -match 'Remove-Item.*modelsCachePath') {
+    Write-TestResult "TC-CLIENT-WIN-15" "Fallback removes stale models_cache.json on sync failure" $true ""
+} else {
+    Write-TestResult "TC-CLIENT-WIN-15" "Fallback removes stale models_cache.json on sync failure" $false "No fallback that clears the stale cache on sync-cache failure"
+}
+
+# ============================================================
 # Summary
 # ============================================================
 Write-Host ""

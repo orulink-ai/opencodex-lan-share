@@ -303,6 +303,58 @@ if (-not $DryRun) {
 Write-Host ""
 
 # ============================================================
+# Step 3.5: Refresh Codex model cache (CRITICAL for model list update)
+# ============================================================
+# Codex Desktop does NOT fetch the model list from /v1/models at runtime.
+# It reads ~/.codex/models_cache.json, which opencodex generates from the catalog
+# with fetched_at forced to 2000-01-01 (so Codex always re-reads). Writing the
+# catalog alone keeps the list stale. `ocx sync-cache` re-reads the catalog and
+# rewrites models_cache.json WITHOUT starting a local proxy or touching base_url,
+# so it is safe here and keeps traffic routed through the LAN server.
+$modelsCachePath = Join-Path $ConfigDir "models_cache.json"
+if ($catalogOk -and $ocxOk) {
+    Write-Host "[3.5/6] Refreshing Codex model cache..." -ForegroundColor Yellow
+    if (-not $DryRun) {
+        # Preserve the previous $ErrorActionPreference and only trust $LASTEXITCODE,
+        # because opencodex may write normal logs to stderr which, under
+        # $ErrorActionPreference="Stop", would be misreported as a failure.
+        $prevEAP = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            $syncOut = & ocx sync-cache 2>&1 | Out-String
+            $syncExit = $LASTEXITCODE
+            if ($syncExit -eq 0) {
+                Write-Host "  [OK] Codex model cache refreshed (models_cache.json rewritten)"
+            } else {
+                Write-Host "  [WARN] ocx sync-cache 返回非零 (exit=$syncExit)" -ForegroundColor Yellow
+                Write-Host ("         " + $syncOut.Trim())
+                # Fallback: a stale models_cache.json is read verbatim by Codex Desktop
+                # on next launch. Removing it (after backup) forces Codex to rebuild it.
+                if (Test-Path $modelsCachePath) {
+                    $mcBackup = $modelsCachePath + ".backup-" + (Get-Date -Format "yyyyMMdd-HHmmss")
+                    Copy-Item $modelsCachePath $mcBackup
+                    Remove-Item -LiteralPath $modelsCachePath -Force
+                    Write-Host "  [WARN] 已备份并删除陈旧的 models_cache.json，下次启动 Codex 将强制重建" -ForegroundColor Yellow
+                }
+            }
+        } catch {
+            Write-Host "  [WARN] 无法刷新 Codex 模型缓存" -ForegroundColor Yellow
+            Write-Host ("         " + $_.Exception.Message)
+        } finally {
+            $ErrorActionPreference = $prevEAP
+        }
+    } else {
+        Write-Host "  [DRY] Would run: ocx sync-cache"
+    }
+    Write-Host ""
+} elseif ($catalogOk) {
+    Write-Host "  [SKIP] opencodex 未就绪，跳过缓存刷新" -ForegroundColor Yellow
+    Write-Host "         请先安装 opencodex 后重跑本脚本，或手动执行: ocx sync-cache" -ForegroundColor Yellow
+    Write-Host "         否则 Codex Desktop 模型列表仍不会更新" -ForegroundColor Yellow
+    Write-Host ""
+}
+
+# ============================================================
 # Step 4: Set API key
 # ============================================================
 Write-Host "[4/6] Setting API key..." -ForegroundColor Yellow
@@ -365,6 +417,12 @@ Write-Host ""
 Write-Host "  How it works:"
 Write-Host "    Your opencodex -> OpenAI protocol -> Server auth-proxy"
 Write-Host "    -> opencodex proxy -> Alibaba / DeepSeek / OpenAI"
+Write-Host ""
+Write-Host "  If models still do not appear after reopening:"
+Write-Host "    Run in a terminal: ocx sync-cache"
+Write-Host "    Then fully quit and reopen Codex Desktop."
+Write-Host "    (ocx sync-cache --restart-codex will also restart Codex, but it may"
+Write-Host "     interrupt any in-progress conversation.)"
 Write-Host ""
 
 if (-not $envSet) {
