@@ -68,11 +68,11 @@ if [ -f "$CONFIG_PATH" ]; then
     echo -e "  ${GREEN}[OK]${NC} 已备份到 $(basename "$BACKUP")"
 
     # 移除旧的 opencodex 配置
-    sed -i.bak '/^openai_base_url\s*=/d' "$CONFIG_PATH"
-    sed -i.bak '/^base_url\s*=/d' "$CONFIG_PATH"
-    sed -i.bak '/^model_provider\s*=/d' "$CONFIG_PATH"
-    sed -i.bak '/^model_catalog_json\s*=/d' "$CONFIG_PATH"
-    sed -i.bak '/^wire_api\s*=/d' "$CONFIG_PATH"
+    sed -i.bak '/^openai_base_url[[:space:]]*=/d' "$CONFIG_PATH"
+    sed -i.bak '/^base_url[[:space:]]*=/d' "$CONFIG_PATH"
+    sed -i.bak '/^model_provider[[:space:]]*=/d' "$CONFIG_PATH"
+    sed -i.bak '/^model_catalog_json[[:space:]]*=/d' "$CONFIG_PATH"
+    sed -i.bak '/^wire_api[[:space:]]*=/d' "$CONFIG_PATH"
     rm -f "${CONFIG_PATH}.bak"
 fi
 
