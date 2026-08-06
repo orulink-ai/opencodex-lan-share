@@ -158,10 +158,62 @@ if ($SkipFirewall) {
 }
 
 # ============================================================
-# Step 4: Service installation (optional)
+# Step 4: Auth Proxy (port 10101)
 # ============================================================
 $StepsTotal++
-Write-Step "Step 5/5: Windows Service..."
+Write-Step "Step 5/6: Auth Proxy (port 10101)..."
+
+$authProxyScript = Join-Path $PSScriptRoot "auth-proxy.py"
+$authProxyPort = 10101
+
+# Firewall for auth proxy
+$fwRuleName2 = "OpenCodex Auth Proxy (Port " + $authProxyPort + ")"
+if (-not $SkipFirewall) {
+    $existingRule2 = Get-NetFirewallRule -DisplayName $fwRuleName2 -ErrorAction SilentlyContinue
+    if (-not $existingRule2) {
+        try {
+            New-NetFirewallRule `
+                -DisplayName $fwRuleName2 `
+                -Description "Allow LAN access to opencodex auth proxy on port " + $authProxyPort `
+                -Direction Inbound `
+                -Protocol TCP `
+                -LocalPort $authProxyPort `
+                -Action Allow `
+                -Profile Private `
+                -ErrorAction Stop | Out-Null
+            Write-StepOK ("Firewall rule created for auth proxy port " + $authProxyPort)
+        } catch {
+            Write-StepWarn ("Failed to create auth proxy firewall rule: " + $_.Exception.Message)
+        }
+    }
+}
+
+# Check if auth proxy already running
+$proxyRunning = $false
+try {
+    $testResult = Invoke-RestMethod -Uri ("http://127.0.0.1:" + $authProxyPort + "/v1/models") -Method Get `
+        -Headers @{"Authorization"="Bearer test"} -TimeoutSec 3 -ErrorAction SilentlyContinue
+    Write-StepOK "Auth proxy already running on port " + $authProxyPort
+    $proxyRunning = $true
+} catch {}
+
+if (-not $proxyRunning) {
+    if (Test-Path $authProxyScript) {
+        Write-StepWarn "Starting auth proxy..."
+        Start-Process python3 -ArgumentList $authProxyScript, "--port", $authProxyPort `
+            -WindowStyle Hidden -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 2
+        Write-StepOK ("Auth proxy started on port " + $authProxyPort)
+    } else {
+        Write-StepWarn ("auth-proxy.py not found at " + $authProxyScript)
+    }
+}
+
+# ============================================================
+# Step 5: Service installation (optional)
+# ============================================================
+$StepsTotal++
+Write-Step "Step 6/6: Windows Service..."
 
 if ($NoService) {
     Write-StepWarn "Service installation skipped (--NoService flag)"

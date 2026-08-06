@@ -77,6 +77,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr -Uri 'https://raw.gi
 ```
 
 > ⚠️ 把 `192.168.1.110` 换成实际 IP，`ocx_data_xxxx` 换成管理员给你的密钥。
+> 注意：密钥**只显示一次**，请妥善保存。
 
 **macOS / Linux 同事：** 打开终端，粘贴运行：
 
